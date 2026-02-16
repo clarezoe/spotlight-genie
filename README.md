@@ -58,6 +58,10 @@ Support the project:
 
 ![Top Languages](https://github-readme-stats.vercel.app/api/top-langs/?username=clarezoe&repo=spotlight-genie&layout=compact)
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=clarezoe/spotlight-genie&type=Date)](https://star-history.com/#clarezoe/spotlight-genie&Date)
+
 ## Built-In Features
 
 | Category | Highlights |
