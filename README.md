@@ -1,84 +1,86 @@
 # Spotlight Genie
 
 <p align="center">
-  <img src="./src-tauri/icons/128x128@2x.png" width="128" alt="Spotlight Genie icon" />
+  <img src="./src-tauri/icons/128x128@2x.png" width="132" alt="Spotlight Genie Icon" />
 </p>
 
 <p align="center">
-  A fast, keyboard-first Spotlight/Alfred-style launcher built with <strong>Tauri 2</strong>, <strong>Rust</strong>, and <strong>Vue 3</strong>.
+  <strong>Spotlight speed. Alfred flexibility. Cross-platform simplicity.</strong><br/>
+  Spotlight Genie is a keyboard-first launcher for macOS, Windows, and Linux, powered by Tauri + Rust for native performance.
 </p>
 
 <p align="center">
-  <a href="https://github.com/clarezoe/spotlight-genie/stargazers"><img src="https://img.shields.io/github/stars/clarezoe/spotlight-genie?style=for-the-badge" alt="Stars" /></a>
-  <a href="https://github.com/clarezoe/spotlight-genie/network/members"><img src="https://img.shields.io/github/forks/clarezoe/spotlight-genie?style=for-the-badge" alt="Forks" /></a>
-  <a href="https://github.com/clarezoe/spotlight-genie/issues"><img src="https://img.shields.io/github/issues/clarezoe/spotlight-genie?style=for-the-badge" alt="Issues" /></a>
-  <a href="https://github.com/clarezoe/spotlight-genie/commits/main"><img src="https://img.shields.io/github/last-commit/clarezoe/spotlight-genie?style=for-the-badge" alt="Last Commit" /></a>
+  <a href="https://github.com/clarezoe/spotlight-genie/stargazers"><img src="https://img.shields.io/github/stars/clarezoe/spotlight-genie?style=for-the-badge" alt="GitHub stars" /></a>
+  <a href="https://github.com/clarezoe/spotlight-genie/network/members"><img src="https://img.shields.io/github/forks/clarezoe/spotlight-genie?style=for-the-badge" alt="GitHub forks" /></a>
+  <a href="https://github.com/clarezoe/spotlight-genie/issues"><img src="https://img.shields.io/github/issues/clarezoe/spotlight-genie?style=for-the-badge" alt="GitHub issues" /></a>
+  <a href="https://github.com/clarezoe/spotlight-genie/commits/main"><img src="https://img.shields.io/github/last-commit/clarezoe/spotlight-genie?style=for-the-badge" alt="Last commit" /></a>
 </p>
 
-## Quick CTA
+## Start in 30 Seconds
 
-- **Run locally now:** `pnpm tauri dev`
-- **Build release app:** `pnpm tauri build`
-- **Support the project:** [☕ Buy Me a Coffee](https://buymeacoffee.com/clarezoe)
+```bash
+pnpm install
+pnpm tauri dev
+```
 
-<p>
-  <a href="https://buymeacoffee.com/clarezoe"><img src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Support%20Spotlight%20Genie-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=000" alt="Buy Me a Coffee" /></a>
-</p>
+Build release:
 
-## Why Spotlight Genie
+```bash
+pnpm tauri build
+```
 
-Spotlight Genie is designed for speed and focus:
+Support the project:
+
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Support%20the%20Project-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=000)](https://buymeacoffee.com/clarezoe)
+
+## What Makes It Great
 
 - Global hotkey launcher (`Cmd+Space` / `Ctrl+Space`)
-- App search with real app icon extraction on macOS
-- Configurable file search folders + file type icons
-- Calculator + currency conversion + web fallback
-- Keyboard-first flow (arrows, Enter, Esc, shortcuts)
-- Tray integration + hide on blur + persistent window behavior
+- Fast fuzzy app discovery with native app icons on macOS
+- Configurable file search folders + file-type specific icons
+- Inline calculator, currency conversion, and web fallback
+- Modern floating UI with keyboard-first navigation
+- Tray menu, hide-on-blur behavior, and position persistence
 
-## Screenshots
+## Real Screenshots
 
-> UI screenshot assets can be dropped into `assets/screenshots/` and linked here.
-> Current visual preview uses shipped app assets.
+### Search UI (empty state)
 
-<p>
-  <img src="./src-tauri/icons/icon.png" width="96" alt="Spotlight Genie preview" />
-  <img src="./src-tauri/icons/128x128.png" width="96" alt="Spotlight Genie preview 2" />
-  <img src="./src-tauri/icons/128x128@2x.png" width="96" alt="Spotlight Genie preview 3" />
-</p>
+![Spotlight Genie Empty Search](./assets/screenshots/search-empty.png)
 
-## Repo Stats
+### Search UI (query in progress)
 
-<p>
-  <img src="https://github-readme-stats.vercel.app/api?username=clarezoe&repo=spotlight-genie&show_icons=true&rank_icon=github" alt="Repo stats" />
-</p>
-<p>
-  <img src="https://github-readme-stats.vercel.app/api/top-langs/?username=clarezoe&repo=spotlight-genie&layout=compact" alt="Top languages" />
-</p>
+![Spotlight Genie Query Search](./assets/screenshots/search-query.png)
 
-## Built-in Features
+## Repository Stats
 
-| Area | What you get |
+![Repo Stats](https://github-readme-stats.vercel.app/api?username=clarezoe&repo=spotlight-genie&show_icons=true&rank_icon=github)
+
+![Top Languages](https://github-readme-stats.vercel.app/api/top-langs/?username=clarezoe&repo=spotlight-genie&layout=compact)
+
+## Built-In Features
+
+| Category | Highlights |
 |---|---|
-| Launcher | Global hotkey, instant panel toggle, tray menu |
-| Search | Fuzzy app search, configurable file search folders |
-| Visuals | Native rounded corners, transparent window, icon rendering |
-| Productivity | Inline calculator, system commands, web fallback |
-| UX | Scrollable results, theme switching (dark/light/auto), settings panel |
+| Launcher | Global toggle, instant focus, keyboard-first flow |
+| Search | Apps, files, commands, plugin results |
+| Productivity | Calculator, currency conversion, web fallback |
+| Visual Quality | Native corners, theming, icon rendering |
+| Settings | Persistent settings panel with folder management |
 
-## Built-in Plugins
+## Built-In Plugins
 
 | Plugin | Keyword | Description |
 |---|---|---|
-| Spotify | `sp` | Play/pause/skip and music-related actions |
-| Currency | `cc` | Real-time conversion, natural-language friendly |
-| Clipboard | `cb` | Searchable clipboard-style quick actions |
+| Spotify | `sp` | Music control and quick access actions |
+| Currency | `cc` | Real-time conversions and natural query support |
+| Clipboard | `cb` | Search and trigger clipboard-based actions |
 
 ## Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Desktop Framework | Tauri 2.x |
+| Desktop | Tauri 2.x |
 | Backend | Rust |
 | Frontend | Vue 3 + TypeScript + Vite |
 | Styling | TailwindCSS 4 |
@@ -87,46 +89,34 @@ Spotlight Genie is designed for speed and focus:
 
 ## Prerequisites
 
-- Rust `1.87+`
 - Node.js `20+`
 - pnpm `10+`
+- Rust `1.87+`
 
-## Run in Development
+## Output Artifacts
 
-```bash
-pnpm install
-pnpm tauri dev
-```
-
-## Build for Release
-
-```bash
-pnpm tauri build
-```
-
-Artifacts:
-
-- macOS app: `src-tauri/target/release/bundle/macos/Spotlight Genie.app`
-- DMG: `src-tauri/target/release/bundle/dmg/Spotlight Genie_0.1.0_aarch64.dmg`
+- macOS App: `src-tauri/target/release/bundle/macos/Spotlight Genie.app`
+- macOS DMG: `src-tauri/target/release/bundle/dmg/Spotlight Genie_0.1.0_aarch64.dmg`
 
 ## Project Structure
 
 ```text
 spotlight-genie/
-├─ src/                      # Vue frontend
-├─ plugins/                  # TS plugin modules
-└─ src-tauri/                # Rust backend + Tauri config
+├─ src/             # Vue frontend
+├─ plugins/         # TS plugins
+├─ src-tauri/       # Rust backend + Tauri config
+└─ assets/          # README screenshots and media
 ```
 
 ## Contributing
 
-1. Fork and clone this repo.
-2. Create a branch: `git checkout -b feat/your-feature`
-3. Commit: `git commit -m "feat: your feature"`
-4. Push and open a PR.
+1. Fork the repository
+2. Create your feature branch: `git checkout -b feat/your-feature`
+3. Commit your changes: `git commit -m "feat: your change"`
+4. Push your branch and open a PR
 
-## Support
+## Support This Project
 
-If Spotlight Genie helps your workflow, support future features:
+If Spotlight Genie improves your daily workflow, you can support development here:
 
-- [☕ Buy Me a Coffee](https://buymeacoffee.com/clarezoe)
+- [https://buymeacoffee.com/clarezoe](https://buymeacoffee.com/clarezoe)
