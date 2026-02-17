@@ -16,7 +16,8 @@ export type ResultCategory =
   | "SYS"
   | "SPOTIFY"
   | "CURRENCY"
-  | "CLIP";
+  | "CLIP"
+  | "CONTACT";
 
 export interface GeniePlugin {
   id: string;

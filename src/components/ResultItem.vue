@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
+import { invoke } from "@tauri-apps/api/core";
 import {
   LayoutGrid,
   File,
@@ -22,6 +23,7 @@ import {
   Type,
   Database,
   Folder,
+  Users,
 } from "lucide-vue-next";
 import type { SearchResult } from "../types";
 import CategoryBadge from "./CategoryBadge.vue";
@@ -57,10 +59,19 @@ const iconMap: Record<string, typeof LayoutGrid> = {
   type: Type,
   database: Database,
   folder: Folder,
+  users: Users,
 };
 
-const isImageIcon = computed(() => props.result.icon.startsWith("data:"));
-const IconComponent = computed(() => iconMap[props.result.icon] || Globe);
+const lazyIcon = ref<string | null>(null);
+const iconRequestId = ref(0);
+
+const effectiveIcon = computed(() => {
+  if (lazyIcon.value) return lazyIcon.value;
+  return props.result.icon;
+});
+
+const isImageIcon = computed(() => effectiveIcon.value?.startsWith("data:"));
+const IconComponent = computed(() => iconMap[effectiveIcon.value] || Globe);
 
 const iconColor = computed(() => {
   const colors: Record<string, string> = {
@@ -70,6 +81,28 @@ const iconColor = computed(() => {
   };
   return colors[props.result.category] || "#94A3B8";
 });
+
+async function loadAppIcon() {
+  lazyIcon.value = null;
+  if (props.result.category !== "APP" || props.result.icon?.startsWith("data:")) return;
+  const requestId = ++iconRequestId.value;
+  try {
+    const icon = await invoke<string | null>("get_app_icon", { appPath: props.result.action_data });
+    if (requestId === iconRequestId.value && icon) {
+      lazyIcon.value = icon;
+    }
+  } catch {
+    // Ignore errors, keep default icon
+  }
+}
+
+watch(
+  () => [props.result.id, props.result.action_data, props.result.icon],
+  () => {
+    void loadAppIcon();
+  },
+  { immediate: true }
+);
 </script>
 
 <template>
@@ -85,7 +118,7 @@ const iconColor = computed(() => {
       class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
       style="background: rgba(255, 255, 255, 0.08)"
     >
-      <img v-if="isImageIcon" :src="result.icon" class="h-6 w-6 rounded" alt="" />
+      <img v-if="isImageIcon" :src="effectiveIcon" class="h-6 w-6 rounded" alt="" />
       <component v-else :is="IconComponent" :size="18" :color="iconColor" />
     </div>
     <div class="flex min-w-0 flex-1 flex-col gap-0.5">

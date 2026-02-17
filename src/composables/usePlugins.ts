@@ -1,9 +1,24 @@
-import { ref } from "vue";
+import { ref, computed } from "vue";
+import { invoke } from "@tauri-apps/api/core";
 import type { GeniePlugin, SearchResult, PluginKeywordMatch } from "../types";
 
 const plugins = ref<GeniePlugin[]>([]);
+const disabledPlugins = ref<string[]>([]);
 
 export function usePlugins() {
+  const enabledPlugins = computed(() =>
+    plugins.value.filter((p) => !disabledPlugins.value.includes(p.id))
+  );
+
+  async function loadDisabledPlugins() {
+    try {
+      const settings = await invoke<{ disabled_plugins?: string[] }>("get_settings");
+      disabledPlugins.value = settings.disabled_plugins || [];
+    } catch {
+      disabledPlugins.value = [];
+    }
+  }
+
   function register(plugin: GeniePlugin) {
     if (!plugins.value.find((p) => p.id === plugin.id)) {
       plugins.value.push(plugin);
@@ -21,7 +36,7 @@ export function usePlugins() {
 
   function matchKeyword(query: string): PluginKeywordMatch | null {
     const trimmed = query.trim();
-    for (const plugin of plugins.value) {
+    for (const plugin of enabledPlugins.value) {
       if (plugin.keyword && trimmed.startsWith(plugin.keyword + " ")) {
         return {
           plugin,
@@ -33,7 +48,7 @@ export function usePlugins() {
   }
 
   async function searchPlugins(query: string): Promise<SearchResult[]> {
-    const globalPlugins = plugins.value.filter((p) => !p.keyword);
+    const globalPlugins = enabledPlugins.value.filter((p) => !p.keyword);
     const allResults: SearchResult[] = [];
     const promises = globalPlugins.map((p) =>
       p.onSearch(query).catch(() => [] as SearchResult[])
@@ -47,9 +62,11 @@ export function usePlugins() {
 
   return {
     plugins,
+    enabledPlugins,
     register,
     unregister,
     matchKeyword,
     searchPlugins,
+    loadDisabledPlugins,
   };
 }

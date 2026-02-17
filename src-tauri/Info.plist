@@ -4,5 +4,7 @@
 <dict>
     <key>LSUIElement</key>
     <true/>
+    <key>NSContactsUsageDescription</key>
+    <string>Spotlight Genie needs access to your contacts to search and display contact information.</string>
 </dict>
 </plist>

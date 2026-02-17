@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { LogicalSize } from "@tauri-apps/api/dpi";
 import SearchBar from "./components/SearchBar.vue";
 import ResultList from "./components/ResultList.vue";
 import ActionBar from "./components/ActionBar.vue";
@@ -15,9 +18,10 @@ import {
   spotifyPlugin,
   currencyPlugin,
   clipboardPlugin,
+  contactsPlugin,
 } from "../plugins";
 
-const { register } = usePlugins();
+const { register, plugins, loadDisabledPlugins } = usePlugins();
 const { query, results, selectedIndex, activeKeyword, clear } = useSearch();
 const showSettings = ref(false);
 useWindowSize(results);
@@ -38,16 +42,43 @@ const panelStyle = computed(() =>
       }
 );
 
-onMounted(() => {
+// Watch settings panel and adjust window size
+watch(showSettings, async (isShowing) => {
+  try {
+    const win = getCurrentWindow();
+    const pos = await win.outerPosition();
+    if (isShowing) {
+      // Settings panel needs more height
+      await win.setSize(new LogicalSize(696, 600));
+    } else {
+      // Back to search mode - let useWindowSize handle it
+      await win.setSize(new LogicalSize(696, 88));
+    }
+    await win.setPosition(pos);
+  } catch (e) {
+    console.warn("Failed to resize window:", e);
+  }
+});
+
+onMounted(async () => {
   initTheme();
   register(spotifyPlugin);
   register(currencyPlugin);
   register(clipboardPlugin);
+  register(contactsPlugin);
+  await loadDisabledPlugins();
+
+  // Listen for settings event from tray menu
+  await listen("genie:show-settings", () => {
+    showSettings.value = true;
+  });
 });
 
 const selectedResult = computed<SearchResult | null>(
   () => results.value[selectedIndex.value] ?? null
 );
+
+const pluginCategories = new Set(["CONTACT", "CLIP", "SPOTIFY", "CURRENCY"]);
 
 async function handleAction(result: SearchResult) {
   if (result.id === "sys:settings") {
@@ -56,6 +87,13 @@ async function handleAction(result: SearchResult) {
   }
   if (result.category === "SYS") {
     await invoke("run_system_command", { command: result.action_data });
+  } else if (pluginCategories.has(result.category)) {
+    const plugin = plugins.value.find((p) =>
+      result.id.startsWith(p.id.split(":")[0]) || p.name.toUpperCase() === result.category
+    );
+    if (plugin?.onAction) {
+      await plugin.onAction(result);
+    }
   } else {
     await invoke("launch_item", {
       actionData: result.action_data,

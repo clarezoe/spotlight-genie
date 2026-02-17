@@ -67,10 +67,11 @@ Support the project:
 | Category | Highlights |
 |---|---|
 | Launcher | Global toggle, instant focus, keyboard-first flow |
-| Search | Apps, files, commands, plugin results |
+| Search | Apps, files, commands, plugin results, contacts |
 | Productivity | Calculator, currency conversion, web fallback |
 | Visual Quality | Native corners, theming, icon rendering |
-| Settings | Persistent settings panel with folder management |
+| Settings | Persistent settings panel with folder management and plugin controls |
+| Menu | Tray menu with quick access to settings and window controls |
 
 ## Built-In Plugins
 
@@ -79,6 +80,7 @@ Support the project:
 | Spotify | `sp` | Music control and quick access actions |
 | Currency | `cc` | Real-time conversions and natural query support |
 | Clipboard | `cb` | Search and trigger clipboard-based actions |
+| Contacts | `contact` | Search macOS contacts by name, email, or phone |
 
 ## Tech Stack
 

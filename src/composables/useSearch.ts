@@ -10,6 +10,7 @@ const isLoading = ref(false);
 const activeKeyword = ref<PluginKeywordMatch | null>(null);
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let latestRequestId = 0;
 
 export function useSearch() {
   const { matchKeyword, searchPlugins } = usePlugins();
@@ -18,38 +19,57 @@ export function useSearch() {
     if (debounceTimer) clearTimeout(debounceTimer);
     const match = matchKeyword(val);
     activeKeyword.value = match;
+    const requestId = ++latestRequestId;
 
     debounceTimer = setTimeout(async () => {
-      await performSearch(val, match);
+      await performSearch(val, match, requestId);
     }, 50);
   });
 
-  async function performSearch(q: string, kwMatch: PluginKeywordMatch | null) {
+  async function performSearch(
+    q: string,
+    kwMatch: PluginKeywordMatch | null,
+    requestId: number
+  ) {
     if (!q.trim()) {
+      if (requestId !== latestRequestId) return;
       results.value = [];
       selectedIndex.value = 0;
       return;
     }
 
-    isLoading.value = true;
+    if (requestId === latestRequestId) {
+      isLoading.value = true;
+    }
+
+    let nextResults: SearchResult[] = [];
     try {
       if (kwMatch) {
-        results.value = await kwMatch.plugin.onSearch(kwMatch.query);
+        nextResults = await kwMatch.plugin.onSearch(kwMatch.query);
       } else {
-        const pluginResults = await searchPlugins(q);
-        let rustResults: SearchResult[] = [];
-        try {
-          rustResults = await invoke<SearchResult[]>("search", { query: q });
-        } catch {
-          // NOTE: invoke fails outside Tauri webview
-        }
+        const withTimeout = <T>(p: Promise<T>, ms: number, fallback: T) =>
+          Promise.race([p, new Promise<T>((r) => setTimeout(() => r(fallback), ms))]);
+        const [pluginResults, rustResults] = await Promise.all([
+          withTimeout(searchPlugins(q), 400, [] as SearchResult[]),
+          invoke<SearchResult[]>("search", { query: q }).catch(() => [] as SearchResult[]),
+        ]);
         const merged = [...pluginResults, ...rustResults];
-        merged.sort((a, b) => b.score - a.score);
-        results.value = merged.slice(0, 8);
+        const normalized = q.trim().toLowerCase();
+        merged.sort((a, b) => {
+          const aRank = a.score + queryMatchBoost(a, normalized);
+          const bRank = b.score + queryMatchBoost(b, normalized);
+          if (aRank !== bRank) return bRank - aRank;
+          return a.title.length - b.title.length;
+        });
+        nextResults = merged.slice(0, 8);
       }
+      if (requestId !== latestRequestId) return;
+      results.value = nextResults;
       selectedIndex.value = 0;
     } finally {
-      isLoading.value = false;
+      if (requestId === latestRequestId) {
+        isLoading.value = false;
+      }
     }
   }
 
@@ -68,4 +88,14 @@ export function useSearch() {
     activeKeyword,
     clear,
   };
+}
+
+function queryMatchBoost(result: SearchResult, normalizedQuery: string): number {
+  if (!normalizedQuery) return 0;
+  const title = result.title.toLowerCase();
+  if (title === normalizedQuery) return 1800;
+  if (title.startsWith(normalizedQuery)) return 900;
+  const idx = title.indexOf(normalizedQuery);
+  if (idx >= 0) return 500 - Math.min(idx * 20, 320);
+  return 0;
 }

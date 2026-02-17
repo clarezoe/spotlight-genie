@@ -1,4 +1,5 @@
 import type { GeniePlugin, SearchResult } from "../../src/types";
+import { invoke } from "@tauri-apps/api/core";
 
 const SPOTIFY_COMMANDS = [
   { cmd: "play", title: "Play / Resume", subtitle: "Spotify • Playback", icon: "music" },
@@ -63,20 +64,19 @@ export const spotifyPlugin: GeniePlugin = {
       if (cmd.startsWith("search:")) {
         const term = cmd.slice(7);
         const url = `https://open.spotify.com/search/${encodeURIComponent(term)}`;
-        const { invoke } = await import("@tauri-apps/api/core");
         await invoke("launch_item", { actionData: url, category: "WEB" });
       } else {
-        // NOTE: Full Spotify Web API integration requires OAuth2 setup
-        const scriptMap: Record<string, string> = {
-          play: "tell application \"Spotify\" to play",
-          pause: "tell application \"Spotify\" to pause",
-          next: "tell application \"Spotify\" to next track",
-          prev: "tell application \"Spotify\" to previous track",
+        const systemCommandMap: Record<string, string> = {
+          play: "spotify_play",
+          pause: "spotify_pause",
+          next: "spotify_next",
+          prev: "spotify_prev",
         };
-        const script = scriptMap[cmd];
-        if (script && navigator.platform.toUpperCase().includes("MAC")) {
-          const { invoke } = await import("@tauri-apps/api/core");
-          await invoke("run_system_command", { command: `osascript:${script}` }).catch(() => {});
+        const systemCommand = systemCommandMap[cmd];
+        if (systemCommand) {
+          await invoke("run_system_command", { command: systemCommand }).catch(
+            () => {}
+          );
         }
       }
     } catch {

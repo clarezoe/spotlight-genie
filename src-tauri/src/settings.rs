@@ -12,6 +12,8 @@ pub struct AppSettings {
     pub show_recent_apps: bool,
     #[serde(default = "default_search_folders")]
     pub search_folders: Vec<String>,
+    #[serde(default)]
+    pub disabled_plugins: Vec<String>,
 }
 
 impl Default for AppSettings {
@@ -23,6 +25,7 @@ impl Default for AppSettings {
             theme: "dark".into(),
             show_recent_apps: true,
             search_folders: default_search_folders(),
+            disabled_plugins: Vec::new(),
         }
     }
 }

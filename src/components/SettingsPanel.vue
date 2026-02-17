@@ -2,8 +2,9 @@
 import { ref, onMounted } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { X, Settings, Keyboard, Monitor, Zap, RotateCcw, FolderPlus, Trash2 } from "lucide-vue-next";
+import { X, Settings, Keyboard, Monitor, Zap, RotateCcw, FolderPlus, Trash2, Plug } from "lucide-vue-next";
 import { useTheme } from "../composables/useTheme";
+import { usePlugins } from "../composables/usePlugins";
 
 interface AppSettings {
   hotkey: string;
@@ -12,9 +13,11 @@ interface AppSettings {
   theme: string;
   show_recent_apps: boolean;
   search_folders: string[];
+  disabled_plugins?: string[];
 }
 
 const { applyTheme } = useTheme();
+const { plugins } = usePlugins();
 const emit = defineEmits<{ close: [] }>();
 const settings = ref<AppSettings>({
   hotkey: "CommandOrControl+Space",
@@ -23,17 +26,107 @@ const settings = ref<AppSettings>({
   theme: "dark",
   show_recent_apps: true,
   search_folders: [],
+  disabled_plugins: [],
 });
 const saving = ref(false);
 const saved = ref(false);
+const capturingHotkey = ref(false);
+const capturedKeys = ref(new Set<string>());
 
 onMounted(async () => {
   try {
     settings.value = await invoke<AppSettings>("get_settings");
+    if (!settings.value.disabled_plugins) {
+      settings.value.disabled_plugins = [];
+    }
   } catch {
     // NOTE: use defaults
   }
 });
+
+function isPluginEnabled(pluginId: string): boolean {
+  return !settings.value.disabled_plugins?.includes(pluginId);
+}
+
+function togglePlugin(pluginId: string) {
+  if (!settings.value.disabled_plugins) {
+    settings.value.disabled_plugins = [];
+  }
+  const index = settings.value.disabled_plugins.indexOf(pluginId);
+  if (index > -1) {
+    settings.value.disabled_plugins.splice(index, 1);
+  } else {
+    settings.value.disabled_plugins.push(pluginId);
+  }
+}
+
+async function startCapture() {
+  capturingHotkey.value = true;
+  capturedKeys.value.clear();
+  await invoke("set_capturing_shortcut", { capturing: true }).catch(() => {});
+  await invoke("unregister_global_shortcut").catch(() => {});
+}
+
+async function stopCapture() {
+  if (!capturingHotkey.value) return;
+  capturingHotkey.value = false;
+  capturedKeys.value.clear();
+  await invoke("set_capturing_shortcut", { capturing: false }).catch(() => {});
+  await invoke("register_global_shortcut").catch(() => {});
+}
+
+function onKeyDown(e: KeyboardEvent) {
+  if (!capturingHotkey.value) return;
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  const keys: string[] = [];
+
+  if (e.metaKey) keys.push("Command");
+  if (e.ctrlKey) keys.push("Control");
+  if (e.altKey) keys.push("Alt");
+  if (e.shiftKey) keys.push("Shift");
+
+  const key = e.key;
+  if (key && !["Control", "Alt", "Shift", "Meta", "Command"].includes(key)) {
+    // NOTE: handle special keys like Space, Enter, Tab, etc.
+    const specialKeyMap: Record<string, string> = {
+      " ": "Space",
+      Enter: "Enter",
+      Tab: "Tab",
+      Escape: "Escape",
+      Backspace: "Backspace",
+      Delete: "Delete",
+      ArrowUp: "Up",
+      ArrowDown: "Down",
+      ArrowLeft: "Left",
+      ArrowRight: "Right",
+      Home: "Home",
+      End: "End",
+      PageUp: "PageUp",
+      PageDown: "PageDown",
+    };
+    const mappedKey = specialKeyMap[key] || (key.length === 1 ? key.toUpperCase() : key);
+    keys.push(mappedKey);
+  }
+
+  if (keys.length >= 2 || (keys.length === 1 && !keys[0].match(/^(Control|Alt|Shift|Command)$/))) {
+    settings.value.hotkey = keys.join("+").replace("Command", "CommandOrControl");
+    stopCapture();
+  }
+}
+
+function formatHotkeyDisplay(hotkey: string): string {
+  return hotkey
+    .replace("CommandOrControl", "⌘/Ctrl")
+    .replace("Command", "⌘")
+    .replace("Control", "Ctrl")
+    .replace("Alt", "⌥")
+    .replace("Shift", "⇧")
+    .replace("Space", "Space")
+    .replace("Plus", "+");
+}
 
 async function addFolder() {
   await invoke("set_suppress_hide", { suppress: true });
@@ -74,6 +167,7 @@ function reset() {
     theme: "dark",
     show_recent_apps: true,
     search_folders: [],
+    disabled_plugins: [],
   };
 }
 </script>
@@ -95,10 +189,18 @@ function reset() {
         <label class="flex items-center gap-2 text-xs font-medium text-genie-text-secondary">
           <Keyboard :size="12" /> Hotkey
         </label>
-        <input
-          v-model="settings.hotkey"
-          class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 font-body text-xs text-genie-text outline-none focus:border-genie-accent"
-        />
+        <div
+        class="w-full rounded-lg border px-3 py-2 font-body text-xs text-genie-text outline-none focus-within:border-genie-accent cursor-pointer select-none transition-colors"
+        :class="capturingHotkey ? 'border-genie-accent bg-genie-accent/10' : 'border-white/10 bg-white/5'"
+        tabindex="0"
+        @click="startCapture"
+        @blur="stopCapture"
+        @keydown="onKeyDown"
+      >
+        <span v-if="capturingHotkey" class="text-genie-accent animate-pulse">Press keys...</span>
+        <span v-else>{{ formatHotkeyDisplay(settings.hotkey) }}</span>
+      </div>
+      <p class="text-[10px] text-genie-text-muted">Click and press your desired shortcut</p>
       </div>
 
       <div class="space-y-2">
@@ -163,6 +265,30 @@ function reset() {
           </div>
         </div>
         <p v-else class="text-[10px] text-genie-text-muted">No folders configured. Click Add to select folders to search.</p>
+      </div>
+
+      <div class="space-y-2">
+        <label class="flex items-center gap-2 text-xs font-medium text-genie-text-secondary">
+          <Plug :size="12" /> Plugins
+        </label>
+        <div class="space-y-1">
+          <label
+            v-for="plugin in plugins"
+            :key="plugin.id"
+            class="flex cursor-pointer items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 hover:bg-white/10"
+          >
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-genie-text">{{ plugin.name }}</span>
+            </div>
+            <input
+              type="checkbox"
+              :checked="isPluginEnabled(plugin.id)"
+              @change="togglePlugin(plugin.id)"
+              class="accent-amber-500"
+            />
+          </label>
+        </div>
+        <p class="text-[10px] text-genie-text-muted">Enable or disable plugins. Changes take effect after saving.</p>
       </div>
     </div>
 

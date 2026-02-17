@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Spotlight Genie",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "identifier": "com.clarezoe.spotlight-genie",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -21,6 +21,7 @@
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
+        "visibleOnAllWorkspaces": true,
         "center": false,
         "visible": true,
         "skipTaskbar": true,
@@ -28,7 +29,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self' customprotocol: asset:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost blob: data:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https://api.exchangerate-api.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
     }
   },
   "bundle": {

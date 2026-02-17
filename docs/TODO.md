@@ -17,11 +17,25 @@
 - [x] Clipboard history plugin (cb keyword)
 - [x] SearchBar, ResultList, ResultItem, ActionBar, CategoryBadge components
 - [x] Dark glassmorphism UI (Outfit + Work Sans fonts)
+- [x] Rust warning cleanup (deprecated macOS private API path and dead-code warnings)
+- [x] Non-blocking file search index cache to prevent search hangs
+- [x] macOS launcher polish (Dock hidden + app icons resolved in search results)
+- [x] Contacts integration now reads real system contacts and matches in normal search
+- [x] Show launcher window immediately on app startup (without hotkey trigger)
+- [x] Search ranking tuned so exact app matches outrank unrelated system commands
+- [x] Search stabilization: ignore stale async responses and re-rank exact title matches first
+- [x] macOS workspace behavior: launcher window appears across all desktops/spaces
+- [x] Robust app ranking + hotkey focus toggle fix for cross-desktop invocation
+- [x] Reworked app matching (normalized exact/prefix/acronym) and app activation on show
+- [x] Settings menu item in tray menu for quick access
+- [x] Plugin management in settings (enable/disable plugins)
+- [x] Improved app launching with macOS 'open -a' command for better activation
+- [x] Enhanced app scanning to find nested apps (Edge, Chrome in subdirectories)
+- [x] Contacts plugin with error handling and extended timeout
 
 ## Next
 - [ ] File search plugin (search filenames in common directories)
 - [ ] Frecency scoring (track usage, boost frequently used items)
-- [ ] Settings UI (configure hotkey, enable/disable plugins)
 - [ ] Auto-start on login
 - [ ] Window appear/dismiss animations
 - [ ] Result character highlighting (matched fuzzy chars)
