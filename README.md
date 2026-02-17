@@ -103,6 +103,8 @@ Support the project:
 
 - macOS App: `src-tauri/target/release/bundle/macos/Spotlight Genie.app`
 - macOS DMG: `src-tauri/target/release/bundle/dmg/Spotlight Genie_0.1.0_aarch64.dmg`
+- Windows MSI: `src-tauri/target/release/bundle/msi/Spotlight Genie_0.1.0_x64_en-US.msi`
+- Windows exe: `src-tauri/target/release/spotlight-genie.exe`
 
 ## Project Structure
 
