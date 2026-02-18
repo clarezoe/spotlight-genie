@@ -141,13 +141,14 @@ pub fn run() {
                         _ => {}
                     }
                 })
-                .on_tray_icon_event(|app: &AppHandle<tauri::Wry>, event: TrayIconEvent| {
+                .on_tray_icon_event(|tray: &tauri::tray::TrayIcon<tauri::Wry>, event: TrayIconEvent| {
                     if let TrayIconEvent::Click {
                         button: MouseButton::Left,
                         button_state: MouseButtonState::Up,
                         ..
                     } = event
                     {
+                        let app = tray.app_handle();
                         if let Some(window) = app.get_webview_window("main") {
                             #[cfg(target_os = "macos")]
                             {
