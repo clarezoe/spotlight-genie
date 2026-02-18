@@ -12,6 +12,28 @@ use tauri::{
 
 fn show_window<R: Runtime>(window: &WebviewWindow<R>) {
     let _ = window.unminimize();
+    // Center on the monitor where the cursor currently is
+    if let Ok(cursor_pos) = window.cursor_position() {
+        if let Ok(monitors) = window.available_monitors() {
+            let active_monitor = monitors.iter().find(|m| {
+                let pos = m.position();
+                let size = m.size();
+                cursor_pos.x >= pos.x as f64
+                    && cursor_pos.x < (pos.x + size.width as i32) as f64
+                    && cursor_pos.y >= pos.y as f64
+                    && cursor_pos.y < (pos.y + size.height as i32) as f64
+            });
+            if let Some(monitor) = active_monitor {
+                let mon_pos = monitor.position();
+                let mon_size = monitor.size();
+                if let Ok(win_size) = window.outer_size() {
+                    let x = mon_pos.x + (mon_size.width as i32 - win_size.width as i32) / 2;
+                    let y = mon_pos.y + (mon_size.height as i32) / 4;
+                    let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
+                }
+            }
+        }
+    }
     let _ = window.show();
     let _ = window.set_focus();
 }
