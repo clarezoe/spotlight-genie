@@ -674,7 +674,7 @@ fn apply_operator(left: f64, right: f64, op: char) -> Option<f64> {
 }
 
 fn is_allowed_web_url(target: &str) -> bool {
-    let parsed = match Url::parse(target) {
+    let parsed: url::Url = match Url::parse(target) {
         Ok(url) => url,
         Err(_) => return false,
     };
@@ -693,17 +693,14 @@ fn is_allowed_app_target(target: &str) -> bool {
 
 #[tauri::command]
 pub async fn get_app_icon(app_path: String) -> Option<String> {
-    tauri::async_runtime::spawn_blocking(move || indexer::get_app_icon(&app_path))
-        .await
-        .ok()
-        .flatten()
+    let result: Result<Option<String>, _> = tauri::async_runtime::spawn_blocking(move || indexer::get_app_icon(&app_path)).await;
+    result.ok().flatten()
 }
 
 #[tauri::command]
 pub async fn get_contacts() -> Vec<ContactEntry> {
-    tauri::async_runtime::spawn_blocking(load_contacts)
-        .await
-        .unwrap_or_default()
+    let result: Result<Vec<ContactEntry>, _> = tauri::async_runtime::spawn_blocking(load_contacts).await;
+    result.unwrap_or_default()
 }
 
 fn load_contacts() -> Vec<ContactEntry> {
