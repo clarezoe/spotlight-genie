@@ -102,7 +102,9 @@ pub fn run() {
             
             let _tray = tray_builder
                 .on_menu_event(move |app, event| match event.id().as_ref() {
-                    "quit" => app.exit(0),
+                    "quit" => {
+                        app.exit(0);
+                    }
                     "show" => {
                         if let Some(window) = app.get_webview_window("main") {
                             #[cfg(target_os = "macos")]

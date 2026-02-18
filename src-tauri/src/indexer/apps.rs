@@ -161,6 +161,14 @@ fn scan_windows_start_menu(entries: &mut Vec<AppEntry>) {
         dirs::home_dir()
             .map(|d| d.join("AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs")),
     ];
+    
+    // Also scan System32 for common executables like notepad, calc, etc.
+    let system32 = std::env::var("SystemRoot")
+        .ok()
+        .map(|d| PathBuf::from(d).join("System32"));
+    
+    let exe_extensions = ["exe", "lnk"];
+    
     for dir in dirs_to_scan.into_iter().flatten() {
         if !dir.exists() {
             continue;
@@ -170,7 +178,8 @@ fn scan_windows_start_menu(entries: &mut Vec<AppEntry>) {
             .filter_map(|e| e.ok())
         {
             let p = entry.path();
-            if p.extension().and_then(|e| e.to_str()) != Some("lnk") {
+            let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("");
+            if !exe_extensions.contains(&ext) {
                 continue;
             }
             let name = p
@@ -184,6 +193,155 @@ fn scan_windows_start_menu(entries: &mut Vec<AppEntry>) {
             entries.push(AppEntry {
                 name,
                 path: p.to_string_lossy().to_string(),
+                icon: None,
+            });
+        }
+    }
+    
+    // Scan System32 for common apps
+    if let Some(ref sys_dir) = system32 {
+        if sys_dir.exists() {
+            let common_apps = vec![
+                "notepad", "calc", "mspaint", "wordpad", "cmd", "powershell",
+                "explorer", "taskmgr", "control", "diskmgmt.msc", "devmgmt.msc",
+                "compmgmt.msc", "services.msc", "ncpa.cpl", "appwiz.cpl",
+            ];
+            if let Ok(read_dir) = std::fs::read_dir(sys_dir) {
+                for entry in read_dir.flatten() {
+                    let p = entry.path();
+                    if p.extension().and_then(|e| e.to_str()) != Some("exe") {
+                        continue;
+                    }
+                    let name = p
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("")
+                        .to_lowercase();
+                    if common_apps.contains(&name.as_str()) {
+                        entries.push(AppEntry {
+                            name: p.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string(),
+                            path: p.to_string_lossy().to_string(),
+                            icon: None,
+                        });
+                    }
+                }
+            }
+        }
+    }
+    
+    // Scan for Spotify and other common installed apps
+    let program_files = std::env::var("ProgramFiles").ok().map(PathBuf::from);
+    let program_files_x86 = std::env::var("ProgramFiles(x86)").ok().map(PathBuf::from);
+    let app_data = dirs::home_dir().map(|d| d.join("AppData"));
+    let local_app_data = std::env::var("LOCALAPPDATA").ok().map(PathBuf::from);
+    
+    let additional_apps = vec![
+        ("Spotify", program_files_x86.as_ref().map(|p| p.join("Spotify\\Spotify.exe"))),
+        ("Spotify", app_data.as_ref().map(|d| d.join("Roaming\\Spotify\\Spotify.exe"))),
+        ("Spotify", program_files.as_ref().map(|p| p.join("Spotify\\Spotify.exe"))),
+    ];
+    
+    for (name, path_opt) in additional_apps {
+        if let Some(path) = path_opt {
+            if path.exists() {
+                entries.push(AppEntry {
+                    name: name.to_string(),
+                    path: path.to_string_lossy().to_string(),
+                    icon: None,
+                });
+            }
+        }
+    }
+    
+    // Scan Windows Store apps (WindowsApps folder)
+    if let Some(ref local_app) = local_app_data {
+        let windows_apps = local_app.join("Microsoft\\WindowsApps");
+        if windows_apps.exists() {
+            if let Ok(read_dir) = std::fs::read_dir(&windows_apps) {
+                for entry in read_dir.flatten() {
+                    let p = entry.path();
+                    if p.extension().and_then(|e| e.to_str()) != Some("exe") {
+                        continue;
+                    }
+                    let name = p.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+                    // Skip common non-app executables
+                    if name.is_empty() || name == "ApplicationFrameHost" || name == "shellexperiencehost" {
+                        continue;
+                    }
+                    entries.push(AppEntry {
+                        name: name.to_string(),
+                        path: p.to_string_lossy().to_string(),
+                        icon: None,
+                    });
+                }
+            }
+        }
+    }
+    
+    // Scan Windows Store apps from Program Files\WindowsApps
+    let program_files_windows_apps = std::env::var("ProgramFiles")
+        .ok()
+        .map(|p| PathBuf::from(p).join("WindowsApps"));
+    
+    if let Some(ref windows_apps) = program_files_windows_apps {
+        if windows_apps.exists() {
+            if let Ok(read_dir) = std::fs::read_dir(windows_apps) {
+                for entry in read_dir.flatten() {
+                    let pkg_path = entry.path();
+                    if !pkg_path.is_dir() {
+                        continue;
+                    }
+                    // Look for executables in the package folder
+                    if let Ok(pkg_dir) = std::fs::read_dir(&pkg_path) {
+                        for pkg_entry in pkg_dir.flatten() {
+                            let p = pkg_entry.path();
+                            if p.extension().and_then(|e| e.to_str()) != Some("exe") {
+                                continue;
+                            }
+                            let name = p.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+                            // Only add main app executables, not helper ones
+                            if name.is_empty() || name.contains("Bootstrap") || name.contains("Runtime") {
+                                continue;
+                            }
+                            // Extract friendly name from package folder name
+                            let pkg_name = pkg_path.file_name().and_then(|s| s.to_str()).unwrap_or("");
+                            let friendly_name = if pkg_name.contains("WhatsApp") {
+                                "WhatsApp"
+                            } else if pkg_name.contains("Spotify") {
+                                "Spotify"
+                            } else if pkg_name.contains("Telegram") {
+                                "Telegram"
+                            } else if pkg_name.contains("Discord") {
+                                "Discord"
+                            } else {
+                                name
+                            };
+                            entries.push(AppEntry {
+                                name: friendly_name.to_string(),
+                                path: p.to_string_lossy().to_string(),
+                                icon: None,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // Add Windows Store apps by AppUserModelId (for apps not found via other methods)
+    // These use shell:AppsFolder\AppUserModelId format for launching
+    let store_apps = vec![
+        ("WhatsApp", "5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App"),
+        ("Telegram", "TelegramMessenger.TelegramDesktop_tg74g890p0sps!TelegramDesktop"),
+        ("Discord", "DiscordInc.Discord_ptb7x0a0a0a0a0a0!Discord"),
+    ];
+    
+    for (name, app_id) in store_apps {
+        // Check if already added via other methods
+        if !entries.iter().any(|e| e.name.to_lowercase() == name.to_lowercase()) {
+            entries.push(AppEntry {
+                name: name.to_string(),
+                path: format!("shell:AppsFolder\\{}", app_id),
                 icon: None,
             });
         }
@@ -258,7 +416,113 @@ pub fn get_app_icon(path: &str) -> Option<String> {
     icon
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
+pub fn get_app_icon(path: &str) -> Option<String> {
+    use std::collections::HashMap;
+    use std::sync::{Mutex, OnceLock};
+
+    static ICON_CACHE: OnceLock<Mutex<HashMap<String, Option<String>>>> = OnceLock::new();
+    let cache = ICON_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Ok(guard) = cache.lock() {
+        if let Some(icon) = guard.get(path) {
+            return icon.clone();
+        }
+    }
+
+    let icon = extract_windows_icon(path);
+    if let Ok(mut guard) = cache.lock() {
+        guard.insert(path.to_string(), icon.clone());
+    }
+    icon
+}
+
+#[cfg(target_os = "windows")]
+fn extract_windows_icon(path: &str) -> Option<String> {
+    // Handle shell:AppsFolder paths (Windows Store apps)
+    if path.starts_with("shell:AppsFolder\\") {
+        // Use PowerShell to get the icon for Windows Store apps
+        let app_id = path.strip_prefix("shell:AppsFolder\\")?;
+        let script = format!(
+            r#"
+Add-Type -AssemblyName System.Drawing
+$shell = New-Object -ComObject Shell.Application
+$appsFolder = $shell.NameSpace("shell:AppsFolder")
+$app = $appsFolder.ParseName("{}")
+if ($app) {{
+    $icon = $app.Thumbnail
+    if ($icon) {{
+        $icon.Size = 32
+        $bmp = New-Object System.Drawing.Bitmap(32, 32)
+        $g = [System.Drawing.Graphics]::FromImage($bmp)
+        $g.Clear([System.Drawing.Color]::Transparent)
+        $icon.GetHBitmap() | ForEach-Object {{
+            $hbitmap = $_
+            $bmp2 = [System.Drawing.Image]::FromHbitmap($hbitmap)
+            $g.DrawImage($bmp2, 0, 0, 32, 32)
+            $bmp2.Dispose()
+        }}
+        $g.Dispose()
+        $ms = New-Object System.IO.MemoryStream
+        $bmp.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
+        [Convert]::ToBase64String($ms.ToArray())
+    }}
+}}
+"#,
+            app_id
+        );
+        let output = std::process::Command::new("powershell")
+            .args(["-NoProfile", "-Command", &script])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .output()
+            .ok()?;
+        if output.status.success() {
+            let b64 = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !b64.is_empty() {
+                return Some(format!("data:image/png;base64,{}", b64));
+            }
+        }
+        return None;
+    }
+
+    // Handle regular exe paths
+    let app_path = std::path::Path::new(path);
+    if !app_path.exists() {
+        return None;
+    }
+
+    // Use PowerShell to extract icon from exe
+    let script = format!(
+        r#"
+Add-Type -AssemblyName System.Drawing
+try {{
+    $icon = [System.Drawing.Icon]::ExtractAssociatedIcon("{}")
+    if ($icon) {{
+        $bmp = $icon.ToBitmap()
+        $ms = New-Object System.IO.MemoryStream
+        $bmp.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
+        [Convert]::ToBase64String($ms.ToArray())
+    }}
+}} catch {{}}
+"#,
+        path.replace('\\', "\\\\").replace('"', "\\\"")
+    );
+    let output = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", &script])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .ok()?;
+    if output.status.success() {
+        let b64 = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !b64.is_empty() {
+            return Some(format!("data:image/png;base64,{}", b64));
+        }
+    }
+    None
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 pub fn get_app_icon(_path: &str) -> Option<String> {
     None
 }
