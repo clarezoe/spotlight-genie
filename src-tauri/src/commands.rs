@@ -82,17 +82,13 @@ pub fn search(query: String) -> Vec<SearchResult> {
     let normalized_query = query.trim().to_lowercase();
 
     let apps = indexer::get_apps();
-    for app in &apps {
-        if let Some(score) = score_app_match(&matcher, &app.name, &normalized_query) {
-            results.push(SearchResult {
-                id: format!("app:{}", app.path),
-                title: app.name.clone(),
-                subtitle: "Application".into(),
-                category: "APP".into(),
-                icon: app.icon.clone().unwrap_or_else(|| "layout-grid".into()),
-                action_data: app.path.clone(),
-                score,
-            });
+    append_matching_apps(&mut results, &apps, &matcher, &normalized_query);
+    let no_app_results = results.iter().all(|entry| entry.category != "APP");
+    if no_app_results && normalized_query.len() >= 3 {
+        if let Some(refreshed_apps) =
+            indexer::refresh_apps_with_cooldown(std::time::Duration::from_secs(20))
+        {
+            append_matching_apps(&mut results, &refreshed_apps, &matcher, &normalized_query);
         }
     }
 
@@ -168,31 +164,31 @@ pub fn launch_item(action_data: String, category: String) -> Result<(), String> 
                 .map_err(|e| e.to_string())?;
             return Ok(());
         }
-        
+
         // Handle regular apps
         if Path::new(&action_data).exists() {
             let app_name = Path::new(&action_data)
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("");
-            
+
             if !app_name.is_empty() {
                 // Use AppleScript to activate app across all Spaces/Desktops
                 let script = format!(
                     r#"tell application "{}" to activate"#,
                     app_name.replace('\\', "\\\\").replace('"', "\\\"")
                 );
-                
+
                 let result = std::process::Command::new("osascript")
                     .arg("-e")
                     .arg(&script)
                     .spawn();
-                
+
                 if let Ok(_child) = result {
                     return Ok(());
                 }
             }
-            
+
             // Fallback to 'open -a' command
             std::process::Command::new("open")
                 .arg("-a")
@@ -399,6 +395,27 @@ fn score_app_match(matcher: &SkimMatcherV2, app_name: &str, query: &str) -> Opti
     matcher
         .fuzzy_match(&normalized_title, &normalized_query)
         .map(|score| 1_200 + score.clamp(0, 2_800))
+}
+
+fn append_matching_apps(
+    results: &mut Vec<SearchResult>,
+    apps: &[indexer::AppEntry],
+    matcher: &SkimMatcherV2,
+    normalized_query: &str,
+) {
+    for app in apps {
+        if let Some(score) = score_app_match(matcher, &app.name, normalized_query) {
+            results.push(SearchResult {
+                id: format!("app:{}", app.path),
+                title: app.name.clone(),
+                subtitle: "Application".into(),
+                category: "APP".into(),
+                icon: app.icon.clone().unwrap_or_else(|| "layout-grid".into()),
+                action_data: app.path.clone(),
+                score,
+            });
+        }
+    }
 }
 
 fn normalize_for_match(input: &str) -> String {
@@ -693,13 +710,15 @@ fn is_allowed_app_target(target: &str) -> bool {
 
 #[tauri::command]
 pub async fn get_app_icon(app_path: String) -> Option<String> {
-    let result: Result<Option<String>, _> = tauri::async_runtime::spawn_blocking(move || indexer::get_app_icon(&app_path)).await;
+    let result: Result<Option<String>, _> =
+        tauri::async_runtime::spawn_blocking(move || indexer::get_app_icon(&app_path)).await;
     result.ok().flatten()
 }
 
 #[tauri::command]
 pub async fn get_contacts() -> Vec<ContactEntry> {
-    let result: Result<Vec<ContactEntry>, _> = tauri::async_runtime::spawn_blocking(load_contacts).await;
+    let result: Result<Vec<ContactEntry>, _> =
+        tauri::async_runtime::spawn_blocking(load_contacts).await;
     result.unwrap_or_default()
 }
 
@@ -840,5 +859,22 @@ mod tests {
     fn substring_match_works() {
         let matcher = SkimMatcherV2::default();
         assert!(score_app_match(&matcher, "System Preferences", "pref").is_some());
+    }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn ghostty_is_discoverable_when_installed() {
+        let ghostty_path = std::path::Path::new("/Applications/Ghostty.app");
+        if !ghostty_path.exists() {
+            return;
+        }
+
+        crate::indexer::init();
+        let results = search("ghostty".to_string());
+        assert!(results.iter().any(|item| {
+            item.category == "APP"
+                && item.title.eq_ignore_ascii_case("ghostty")
+                && item.action_data.ends_with("Ghostty.app")
+        }));
     }
 }

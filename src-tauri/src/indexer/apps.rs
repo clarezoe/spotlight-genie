@@ -15,13 +15,8 @@ pub fn scan_applications_fast() -> Vec<AppEntry> {
 
     #[cfg(target_os = "macos")]
     {
-        scan_macos_dir_fast("/Applications", &mut entries);
-        scan_macos_dir_fast("/Applications/Utilities", &mut entries);
-        scan_macos_dir_fast("/System/Applications", &mut entries);
-        scan_macos_dir_fast("/System/Applications/Utilities", &mut entries);
-        if let Some(home) = dirs::home_dir() {
-            let user_apps = home.join("Applications");
-            scan_macos_dir_fast(user_apps.to_str().unwrap_or(""), &mut entries);
+        for dir in macos_app_scan_roots() {
+            scan_macos_dir_fast(dir.to_string_lossy().as_ref(), &mut entries);
         }
         scan_macos_prefpanes(&mut entries);
     }
@@ -39,6 +34,44 @@ pub fn scan_applications_fast() -> Vec<AppEntry> {
     entries.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     entries.dedup_by(|a, b| a.name.eq_ignore_ascii_case(&b.name));
     entries
+}
+
+#[cfg(target_os = "macos")]
+fn macos_app_scan_roots() -> Vec<PathBuf> {
+    let mut roots = vec![
+        PathBuf::from("/Applications"),
+        PathBuf::from("/Applications/Utilities"),
+        PathBuf::from("/System/Applications"),
+        PathBuf::from("/System/Applications/Utilities"),
+    ];
+
+    if let Some(home) = dirs::home_dir() {
+        roots.push(home.join("Applications"));
+    }
+
+    roots.extend(homebrew_cask_roots());
+    roots
+}
+
+#[cfg(target_os = "macos")]
+fn homebrew_cask_roots() -> Vec<PathBuf> {
+    let mut prefixes = vec![PathBuf::from("/opt/homebrew"), PathBuf::from("/usr/local")];
+
+    if let Ok(prefix) = std::env::var("HOMEBREW_PREFIX") {
+        prefixes.push(PathBuf::from(prefix));
+    }
+    if let Ok(prefixes_env) = std::env::var("SPOTLIGHT_GENIE_HOMEBREW_PREFIXES") {
+        for prefix in prefixes_env.split(':').filter(|s| !s.trim().is_empty()) {
+            prefixes.push(PathBuf::from(prefix.trim()));
+        }
+    }
+
+    prefixes.sort();
+    prefixes.dedup();
+    prefixes
+        .into_iter()
+        .map(|prefix| prefix.join("Caskroom"))
+        .collect()
 }
 
 #[cfg(target_os = "macos")]
@@ -161,14 +194,14 @@ fn scan_windows_start_menu(entries: &mut Vec<AppEntry>) {
         dirs::home_dir()
             .map(|d| d.join("AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs")),
     ];
-    
+
     // Also scan System32 for common executables like notepad, calc, etc.
     let system32 = std::env::var("SystemRoot")
         .ok()
         .map(|d| PathBuf::from(d).join("System32"));
-    
+
     let exe_extensions = ["exe", "lnk"];
-    
+
     for dir in dirs_to_scan.into_iter().flatten() {
         if !dir.exists() {
             continue;
@@ -197,14 +230,26 @@ fn scan_windows_start_menu(entries: &mut Vec<AppEntry>) {
             });
         }
     }
-    
+
     // Scan System32 for common apps
     if let Some(ref sys_dir) = system32 {
         if sys_dir.exists() {
             let common_apps = vec![
-                "notepad", "calc", "mspaint", "wordpad", "cmd", "powershell",
-                "explorer", "taskmgr", "control", "diskmgmt.msc", "devmgmt.msc",
-                "compmgmt.msc", "services.msc", "ncpa.cpl", "appwiz.cpl",
+                "notepad",
+                "calc",
+                "mspaint",
+                "wordpad",
+                "cmd",
+                "powershell",
+                "explorer",
+                "taskmgr",
+                "control",
+                "diskmgmt.msc",
+                "devmgmt.msc",
+                "compmgmt.msc",
+                "services.msc",
+                "ncpa.cpl",
+                "appwiz.cpl",
             ];
             if let Ok(read_dir) = std::fs::read_dir(sys_dir) {
                 for entry in read_dir.flatten() {
@@ -219,7 +264,11 @@ fn scan_windows_start_menu(entries: &mut Vec<AppEntry>) {
                         .to_lowercase();
                     if common_apps.contains(&name.as_str()) {
                         entries.push(AppEntry {
-                            name: p.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string(),
+                            name: p
+                                .file_stem()
+                                .and_then(|s| s.to_str())
+                                .unwrap_or("")
+                                .to_string(),
                             path: p.to_string_lossy().to_string(),
                             icon: None,
                         });
@@ -228,19 +277,34 @@ fn scan_windows_start_menu(entries: &mut Vec<AppEntry>) {
             }
         }
     }
-    
+
     // Scan for Spotify and other common installed apps
     let program_files = std::env::var("ProgramFiles").ok().map(PathBuf::from);
     let program_files_x86 = std::env::var("ProgramFiles(x86)").ok().map(PathBuf::from);
     let app_data = dirs::home_dir().map(|d| d.join("AppData"));
     let local_app_data = std::env::var("LOCALAPPDATA").ok().map(PathBuf::from);
-    
+
     let additional_apps = vec![
-        ("Spotify", program_files_x86.as_ref().map(|p| p.join("Spotify\\Spotify.exe"))),
-        ("Spotify", app_data.as_ref().map(|d| d.join("Roaming\\Spotify\\Spotify.exe"))),
-        ("Spotify", program_files.as_ref().map(|p| p.join("Spotify\\Spotify.exe"))),
+        (
+            "Spotify",
+            program_files_x86
+                .as_ref()
+                .map(|p| p.join("Spotify\\Spotify.exe")),
+        ),
+        (
+            "Spotify",
+            app_data
+                .as_ref()
+                .map(|d| d.join("Roaming\\Spotify\\Spotify.exe")),
+        ),
+        (
+            "Spotify",
+            program_files
+                .as_ref()
+                .map(|p| p.join("Spotify\\Spotify.exe")),
+        ),
     ];
-    
+
     for (name, path_opt) in additional_apps {
         if let Some(path) = path_opt {
             if path.exists() {
@@ -252,7 +316,7 @@ fn scan_windows_start_menu(entries: &mut Vec<AppEntry>) {
             }
         }
     }
-    
+
     // Scan Windows Store apps (WindowsApps folder)
     if let Some(ref local_app) = local_app_data {
         let windows_apps = local_app.join("Microsoft\\WindowsApps");
@@ -265,7 +329,10 @@ fn scan_windows_start_menu(entries: &mut Vec<AppEntry>) {
                     }
                     let name = p.file_stem().and_then(|s| s.to_str()).unwrap_or("");
                     // Skip common non-app executables
-                    if name.is_empty() || name == "ApplicationFrameHost" || name == "shellexperiencehost" {
+                    if name.is_empty()
+                        || name == "ApplicationFrameHost"
+                        || name == "shellexperiencehost"
+                    {
                         continue;
                     }
                     entries.push(AppEntry {
@@ -277,12 +344,12 @@ fn scan_windows_start_menu(entries: &mut Vec<AppEntry>) {
             }
         }
     }
-    
+
     // Scan Windows Store apps from Program Files\WindowsApps
     let program_files_windows_apps = std::env::var("ProgramFiles")
         .ok()
         .map(|p| PathBuf::from(p).join("WindowsApps"));
-    
+
     if let Some(ref windows_apps) = program_files_windows_apps {
         if windows_apps.exists() {
             if let Ok(read_dir) = std::fs::read_dir(windows_apps) {
@@ -300,11 +367,15 @@ fn scan_windows_start_menu(entries: &mut Vec<AppEntry>) {
                             }
                             let name = p.file_stem().and_then(|s| s.to_str()).unwrap_or("");
                             // Only add main app executables, not helper ones
-                            if name.is_empty() || name.contains("Bootstrap") || name.contains("Runtime") {
+                            if name.is_empty()
+                                || name.contains("Bootstrap")
+                                || name.contains("Runtime")
+                            {
                                 continue;
                             }
                             // Extract friendly name from package folder name
-                            let pkg_name = pkg_path.file_name().and_then(|s| s.to_str()).unwrap_or("");
+                            let pkg_name =
+                                pkg_path.file_name().and_then(|s| s.to_str()).unwrap_or("");
                             let friendly_name = if pkg_name.contains("WhatsApp") {
                                 "WhatsApp"
                             } else if pkg_name.contains("Spotify") {
@@ -327,18 +398,24 @@ fn scan_windows_start_menu(entries: &mut Vec<AppEntry>) {
             }
         }
     }
-    
+
     // Add Windows Store apps by AppUserModelId (for apps not found via other methods)
     // These use shell:AppsFolder\AppUserModelId format for launching
     let store_apps = vec![
         ("WhatsApp", "5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App"),
-        ("Telegram", "TelegramMessenger.TelegramDesktop_tg74g890p0sps!TelegramDesktop"),
+        (
+            "Telegram",
+            "TelegramMessenger.TelegramDesktop_tg74g890p0sps!TelegramDesktop",
+        ),
         ("Discord", "DiscordInc.Discord_ptb7x0a0a0a0a0a0!Discord"),
     ];
-    
+
     for (name, app_id) in store_apps {
         // Check if already added via other methods
-        if !entries.iter().any(|e| e.name.to_lowercase() == name.to_lowercase()) {
+        if !entries
+            .iter()
+            .any(|e| e.name.to_lowercase() == name.to_lowercase())
+        {
             entries.push(AppEntry {
                 name: name.to_string(),
                 path: format!("shell:AppsFolder\\{}", app_id),
@@ -697,4 +774,46 @@ fn data_uri_from_source(source: &std::path::Path) -> Option<String> {
         return None;
     }
     Some(format!("data:image/png;base64,{}", STANDARD.encode(bytes)))
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    use super::*;
+    use std::path::Path;
+    use std::sync::{Mutex, OnceLock};
+
+    static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+    fn env_guard() -> std::sync::MutexGuard<'static, ()> {
+        ENV_LOCK
+            .get_or_init(|| Mutex::new(()))
+            .lock()
+            .expect("env lock")
+    }
+
+    #[test]
+    fn homebrew_scan_roots_include_common_prefixes() {
+        let _guard = env_guard();
+        std::env::remove_var("HOMEBREW_PREFIX");
+        std::env::remove_var("SPOTLIGHT_GENIE_HOMEBREW_PREFIXES");
+
+        let roots = homebrew_cask_roots();
+        assert!(roots.contains(&Path::new("/opt/homebrew/Caskroom").to_path_buf()));
+        assert!(roots.contains(&Path::new("/usr/local/Caskroom").to_path_buf()));
+    }
+
+    #[test]
+    fn homebrew_scan_roots_include_env_overrides() {
+        let _guard = env_guard();
+        std::env::set_var("HOMEBREW_PREFIX", "/tmp/custom-brew");
+        std::env::set_var(
+            "SPOTLIGHT_GENIE_HOMEBREW_PREFIXES",
+            "/tmp/brew-a:/tmp/brew-b",
+        );
+
+        let roots = homebrew_cask_roots();
+        assert!(roots.contains(&Path::new("/tmp/custom-brew/Caskroom").to_path_buf()));
+        assert!(roots.contains(&Path::new("/tmp/brew-a/Caskroom").to_path_buf()));
+        assert!(roots.contains(&Path::new("/tmp/brew-b/Caskroom").to_path_buf()));
+    }
 }

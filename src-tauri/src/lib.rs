@@ -5,7 +5,7 @@ mod settings;
 
 use std::sync::atomic::Ordering;
 use tauri::{
-    menu::{MenuBuilder, MenuItemBuilder, MenuEvent},
+    menu::{MenuBuilder, MenuEvent, MenuItemBuilder},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, Runtime, WebviewWindow, Window, WindowEvent,
 };

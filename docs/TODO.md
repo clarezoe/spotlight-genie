@@ -31,6 +31,8 @@
 - [x] Plugin management in settings (enable/disable plugins)
 - [x] Improved app launching with macOS 'open -a' command for better activation
 - [x] Enhanced app scanning to find nested apps (Edge, Chrome in subdirectories)
+- [x] macOS app discovery now includes Homebrew Cask installations
+- [x] Search auto-refreshes stale app index on app-miss queries (cooldown-protected)
 - [x] Contacts plugin with error handling and extended timeout
 
 ## Next
